@@ -128,8 +128,75 @@ from ansible.module_utils._text import to_native
 
 # More will be added as module features are expanded
 CATEGORY_COMMANDS_ALL = {
-    "Systems": ["SetBiosDefaultSettings", "SetBiosAttributes"]
+    "Systems": ["SetBiosDefaultSettings", "SetBiosAttributes"],
+    "Manager": ["SetNetworkServices"]
 }
+
+
+"""
+            network_services=dict(
+                type='dict',
+                default={},
+                options=dict(
+                    SNMP=dict(
+                        default={},
+                        type='dict'
+                    ),
+                    VirtualMedia=dict(
+                        default={},
+                        type='dict'
+                    ),
+                    Telnet=dict(
+                        default={},
+                        type='dict'
+                    ),
+                    IPMI=dict(
+                        default={},
+                        type='dict'
+                    ),
+                    SSH=dict(
+                        default={},
+                        type='dict'
+                    ),
+                    KVMIP=dict(
+                        default={},
+                        type='dict'
+                    ),
+                    HTTP=dict(
+                        default={},
+                        type='dict'
+                    ),
+                    DHCP=dict(
+                        default={},
+                        type='dict'
+                    ),
+                    DHCPv6=dict(
+                        default={},
+                        type='dict'
+                    ),
+                    RDP=dict(
+                        default={},
+                        type='dict'
+                    ),
+                    RFM=dict(
+                        default={},
+                        type='dict'
+                    ),
+                    SDDP=dict(
+                        default={},
+                        type='dict'
+                    ),
+                    RFMNTP=dict(
+                        default={},
+                        type='dict'
+                    ),
+                    HTTPS=dict(
+                        default={},
+                        type='dict'
+                    )
+                )
+            )
+            """
 
 
 def main():
@@ -143,7 +210,11 @@ def main():
             password=dict(required=True, no_log=True),
             bios_attribute_name=dict(default='null'),
             bios_attribute_value=dict(default='null'),
-            timeout=dict(type='int', default=10)
+            timeout=dict(type='int', default=10),
+            network_services=dict(
+                type='dict',
+                default={}
+            )
         ),
         supports_check_mode=False
     )
@@ -162,8 +233,11 @@ def main():
     bios_attributes = {'bios_attr_name': module.params['bios_attribute_name'],
                        'bios_attr_value': module.params['bios_attribute_value']}
 
+    # Manager network services
+    network_services = module.params['network_services']
+
     # Build root URI
-    root_uri = "https://" + module.params['baseuri']
+    root_uri = "http://" + module.params['baseuri']
     rf_utils = RedfishUtils(creds, root_uri, timeout, module)
 
     # Check that Category is valid
@@ -188,6 +262,17 @@ def main():
                 result = rf_utils.set_bios_default_settings()
             elif command == "SetBiosAttributes":
                 result = rf_utils.set_bios_attributes(bios_attributes)
+
+    elif category == "Manager":
+        # execute only if we find a Manager service resource
+        result = rf_utils._find_managers_resource()
+        if result['ret'] is False:
+            module.fail_json(msg=to_native(result['msg']))
+        for command in command_list:
+            if command == "SetNetworkServices":
+                module.deprecate(
+                    msg='network_services: {}'.format(network_services))
+                result = {'ret': True, 'msg': 'testing', 'changed': False}
 
     # Return data back or fail with proper message
     if result['ret'] is True:
