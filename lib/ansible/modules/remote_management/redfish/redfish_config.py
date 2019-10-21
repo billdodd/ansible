@@ -128,7 +128,7 @@ from ansible.module_utils._text import to_native
 
 # More will be added as module features are expanded
 CATEGORY_COMMANDS_ALL = {
-    "Systems": ["SetBiosDefaultSettings", "SetBiosAttributes"]
+    "Systems": ["SetBiosDefaultSettings", "SetBiosAttributes", "CreateVolume"]
 }
 
 
@@ -163,7 +163,7 @@ def main():
                        'bios_attr_value': module.params['bios_attribute_value']}
 
     # Build root URI
-    root_uri = "https://" + module.params['baseuri']
+    root_uri = "http://" + module.params['baseuri']
     rf_utils = RedfishUtils(creds, root_uri, timeout, module)
 
     # Check that Category is valid
@@ -188,6 +188,8 @@ def main():
                 result = rf_utils.set_bios_default_settings()
             elif command == "SetBiosAttributes":
                 result = rf_utils.set_bios_attributes(bios_attributes)
+            elif command == "CreateVolume":
+                result = rf_utils.create_volume()
 
     # Return data back or fail with proper message
     if result['ret'] is True:

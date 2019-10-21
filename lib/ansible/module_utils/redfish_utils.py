@@ -584,6 +584,68 @@ class RedfishUtils(object):
     def get_multi_volume_inventory(self):
         return self.aggregate(self.get_volume_inventory)
 
+    def create_volume(self):
+        result = {}
+
+        # TODO(bdodd): actual system will be specified via resource_id
+        systems_uri = self.systems_uris[0]
+
+        # Find Storage service
+        response = self.get_request(self.root_uri + systems_uri)
+        if response['ret'] is False:
+            return response
+        data = response['data']
+
+        if 'Storage' not in data:
+            return {'ret': False, 'msg': "Storage resource not found"}
+
+        storage_uri = data['Storage']['@odata.id']
+        response = self.get_request(self.root_uri + storage_uri)
+        if response['ret'] is False:
+            return response
+        result['ret'] = True
+        data = response['data']
+
+        storage_list = [
+            i['@odata.id'] for i in data.get('Members', [])]
+        if not storage_list:
+            return {'ret': False,
+                    'msg': "Storage Members array is either empty or missing"}
+
+        for s in storage_list:
+            uri = self.root_uri + s
+            response = self.get_request(uri)
+            if response['ret'] is False:
+                return response
+            data = response['data']
+
+            if 'StorageControllers' in data:
+                for c in data['StorageControllers']:
+                    pass
+
+            if 'Volumes' in data:
+                volumes_uri = data['Volumes']['@odata.id']
+                response = self.get_request(self.root_uri + volumes_uri)
+                vol_data = response['data']
+
+            # TODO(bdodd): data structure to get drives of MediaType, BS, etc.
+            drive_results = []
+            if 'Drives' in data:
+                for d in data['Drives']:
+                    drive_uri = self.root_uri + d['@odata.id']
+                    response = self.get_request(drive_uri)
+                    drive_data = response['data']
+                    properties = ['BlockSizeBytes', 'HotspareType', 'Id',
+                                  'MediaType', 'Name']
+                    drive_result = {}
+                    for property in properties:
+                        if property in data:
+                            if data[property] is not None:
+                                drive_result[property] = data[property]
+                    drive_results.append(drive_result)
+
+
+
     def restart_manager_gracefully(self):
         result = {}
         key = "Actions"
