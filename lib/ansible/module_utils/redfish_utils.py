@@ -7,6 +7,7 @@ __metaclass__ = type
 import json
 from ansible.module_utils.urls import open_url
 from ansible.module_utils._text import to_text
+from ansible.module_utils.six import iteritems
 from ansible.module_utils.six.moves import http_client
 from ansible.module_utils.six.moves.urllib.error import URLError, HTTPError
 
@@ -584,8 +585,16 @@ class RedfishUtils(object):
     def get_multi_volume_inventory(self):
         return self.aggregate(self.get_volume_inventory)
 
+    @staticmethod
+    def _inv_map(m):
+        inv_map = {}
+        for k, v in iteritems(m):
+            # inv_map.setdefault(v, []).append(k)
+            inv_map.setdefault(v, set()).add(k)
+        return inv_map
+
     def create_volume(self):
-        result = {}
+        result = {'entries': []}
 
         # TODO(bdodd): actual system will be specified via resource_id
         systems_uri = self.systems_uris[0]
@@ -630,6 +639,10 @@ class RedfishUtils(object):
 
             # TODO(bdodd): data structure to get drives of MediaType, BS, etc.
             drive_results = []
+            drivename_map = {}
+            blocksize_map = {}
+            mediatype_map = {}
+            sparetype_map = {}
             if 'Drives' in data:
                 for d in data['Drives']:
                     drive_uri = self.root_uri + d['@odata.id']
@@ -637,14 +650,42 @@ class RedfishUtils(object):
                     drive_data = response['data']
                     properties = ['BlockSizeBytes', 'HotspareType', 'Id',
                                   'MediaType', 'Name']
+
+                    if 'Id' in drive_data:
+                        ident = drive_data['Id']
+                        drivename_map[ident] = drive_data.get('Name', 'Unknown')
+                        blocksize_map[ident] = drive_data.get('BlockSizeBytes', -1)
+                        mediatype_map[ident] = drive_data.get('MediaType', 'Unknown')
+                        sparetype_map[ident] = drive_data.get('HotspareType', 'Unknown')
+
                     drive_result = {}
                     for property in properties:
-                        if property in data:
-                            if data[property] is not None:
-                                drive_result[property] = data[property]
+                        if drive_data.get(property):
+                            drive_result[property] = drive_data[property]
                     drive_results.append(drive_result)
+            blocksize_inv = self._inv_map(blocksize_map)
+            mediatype_inv = self._inv_map(mediatype_map)
+            sparetype_inv = self._inv_map(sparetype_map)
+            self.module.warn('s: {}, drive_results: {}'.format(s, drive_results))
+            self.module.warn(
+                's: {}, drivename_map: {}'.format(s, drivename_map))
+            self.module.warn(
+                's: {}, blocksize_map: {}'.format(s, blocksize_map))
+            self.module.warn(
+                's: {}, blocksize_inv: {}'.format(s, blocksize_inv))
+            self.module.warn(
+                's: {}, mediatype_map: {}'.format(s, mediatype_map))
+            self.module.warn(
+                's: {}, mediatype_inv: {}'.format(s, mediatype_inv))
+            self.module.warn(
+                's: {}, sparetype_map: {}'.format(s, sparetype_map))
+            self.module.warn(
+                's: {}, sparetype_inv: {}'.format(s, sparetype_inv))
+            result["entries"].append(drive_results)
 
-
+        result['changed'] = False
+        result['msg'] = 'Volume inventory scanned'
+        return result
 
     def restart_manager_gracefully(self):
         result = {}
