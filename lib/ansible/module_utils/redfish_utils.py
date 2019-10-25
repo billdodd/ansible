@@ -622,12 +622,17 @@ class RedfishUtils(object):
                     'msg': "Storage Members array is either empty or missing"}
 
         for s in storage_list:
+            storage_dict = {}
             uri = self.root_uri + s
             response = self.get_request(uri)
             if response['ret'] is False:
                 return response
             data = response['data']
 
+            storage_name = data.get('Name', 'Storage Controller')
+            storage_dict['storage_name'] = storage_name
+
+            # Normally just 1 controller; others would be for HA
             if 'StorageControllers' in data:
                 for c in data['StorageControllers']:
                     pass
@@ -639,6 +644,7 @@ class RedfishUtils(object):
 
             # TODO(bdodd): data structure to get drives of MediaType, BS, etc.
             drive_results = []
+            uri_map = {}
             drivename_map = {}
             blocksize_map = {}
             mediatype_map = {}
@@ -654,6 +660,7 @@ class RedfishUtils(object):
 
                     if 'Id' in drive_data:
                         ident = drive_data['Id']
+                        uri_map[ident] = drive_data.get('@odata.id', 'Unknown')
                         drivename_map[ident] = drive_data.get('Name', 'Unknown')
                         blocksize_map[ident] = drive_data.get('BlockSizeBytes', -1)
                         mediatype_map[ident] = drive_data.get('MediaType', 'Unknown')
@@ -665,30 +672,27 @@ class RedfishUtils(object):
                         if drive_data.get(property):
                             drive_result[property] = drive_data[property]
                     drive_results.append(drive_result)
+
+            uri_inv = self._inv_map(uri_map)
             blocksize_inv = self._inv_map(blocksize_map)
             mediatype_inv = self._inv_map(mediatype_map)
             sparetype_inv = self._inv_map(sparetype_map)
             protocol_inv = self._inv_map(protocol_map)
-            self.module.warn('s: {}, drive_results: {}'.format(s, drive_results))
-            self.module.warn(
-                's: {}, drivename_map: {}'.format(s, drivename_map))
-            self.module.warn(
-                's: {}, blocksize_map: {}'.format(s, blocksize_map))
-            self.module.warn(
-                's: {}, blocksize_inv: {}'.format(s, blocksize_inv))
-            self.module.warn(
-                's: {}, mediatype_map: {}'.format(s, mediatype_map))
-            self.module.warn(
-                's: {}, mediatype_inv: {}'.format(s, mediatype_inv))
-            self.module.warn(
-                's: {}, sparetype_map: {}'.format(s, sparetype_map))
-            self.module.warn(
-                's: {}, sparetype_inv: {}'.format(s, sparetype_inv))
-            self.module.warn(
-                's: {}, protocol_map: {}'.format(s, protocol_map))
-            self.module.warn(
-                's: {}, protocol_inv: {}'.format(s, protocol_inv))
-            result["entries"].append(drive_results)
+
+            storage_dict['drive_results'] = drive_results
+            storage_dict['uri_map'] = uri_map
+            storage_dict['drivename_map'] = drivename_map
+            storage_dict['blocksize_map'] = blocksize_map
+            storage_dict['mediatype_map'] = mediatype_map
+            storage_dict['sparetype_map'] = sparetype_map
+            storage_dict['protocol_map'] = protocol_map
+            storage_dict['uri_inv'] = uri_inv
+            storage_dict['blocksize_inv'] = blocksize_inv
+            storage_dict['mediatype_inv'] = mediatype_inv
+            storage_dict['sparetype_inv'] = sparetype_inv
+            storage_dict['protocol_inv'] = protocol_inv
+
+            result["entries"].append(storage_dict)
 
         result['changed'] = False
         result['msg'] = 'Volume inventory scanned'

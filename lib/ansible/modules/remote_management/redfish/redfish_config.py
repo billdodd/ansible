@@ -193,7 +193,9 @@ def main():
 
     # Return data back or fail with proper message
     if result['ret'] is True:
-        module.exit_json(changed=result['changed'], msg=to_native(result['msg']))
+        module.exit_json(changed=result['changed'],
+                         msg=to_native(result['msg']),
+                         entries=result['entries'])
     else:
         module.fail_json(msg=to_native(result['msg']))
 
